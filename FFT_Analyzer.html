@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compressor Acceleration Analysis Dashboard 📊</title>
+    <style>
+        :root {
+            --bg-main: #0a0a0f;
+            --bg-group: rgba(20, 20, 30, 0.5);
+            --bg-card: rgba(30, 30, 45, 0.45);
+            --bg-input: rgba(255, 255, 255, 0.05);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-cyan: #00e5ff;
+            --accent-purple: #7c4dff;
+            --accent-green: #00e676;
+            --accent-red: #ff1744;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Main Splitter Layout */
+        .app-container {
+            display: flex;
+            flex: 1;
+            height: 100vh;
+            padding: 15px;
+            gap: 15px;
+            overflow: hidden;
+        }
+
+        /* Left Control Panel */
+        .control-panel {
+            width: 400px;
+            min-width: 340px;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 4px;
+            flex-shrink: 0;
+        }
+
+        /* Splitter Handle */
+        .splitter-handle {
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            border-radius: 3px;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .splitter-handle:hover, .splitter-handle.dragging {
+            background: rgba(0, 229, 255, 0.35);
+        }
+
+        /* Logo Area */
+        .logo-widget {
+            padding-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .lbl-logo {
+            font-size: 16pt;
+            font-weight: bold;
+            color: var(--text-primary);
+            letter-spacing: -0.2px;
+        }
+
+        .lbl-sub {
+            font-size: 8.5pt;
+            color: var(--text-secondary);
+        }
+
+        /* GroupBox equivalent */
+        .group-box {
+            position: relative;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            background-color: var(--bg-group);
+            margin-top: 8px;
+            padding: 18px 12px 12px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .group-box-title {
+            position: absolute;
+            top: -9px;
+            left: 12px;
+            background-color: #0f0f17;
+            padding: 0 6px;
+            font-weight: bold;
+            font-size: 9pt;
+            color: var(--text-secondary);
+            border-radius: 4px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%);
+            color: #05050a;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 9.5pt;
+            cursor: pointer;
+            transition: filter 0.15s, transform 0.05s;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #33ebff 0%, #9670ff 100%);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            background: linear-gradient(135deg, #00bacc 0%, #6236cc 100%);
+        }
+
+        .btn-primary:disabled {
+            background: #232333;
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-weight: bold;
+            font-size: 9.5pt;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:disabled {
+            background: #232333;
+            color: var(--text-muted);
+            border-color: transparent;
+            cursor: not-allowed;
+        }
+
+        .btn-analyze {
+            height: 42px;
+            flex-shrink: 0;
+        }
+
+        .btn-export {
+            height: 36px;
+            flex-shrink: 0;
+        }
+
+        .btn-save-jpg {
+            width: 95px;
+            padding: 5px 8px;
+            font-size: 8.5pt;
+        }
+
+        /* File label */
+        .active-file-label {
+            color: var(--text-muted);
+            font-size: 9pt;
+            word-break: break-all;
+            line-height: 1.35;
+        }
+
+        .active-file-label.loaded {
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        /* Metadata Grid */
+        .meta-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            row-gap: 6px;
+            column-gap: 16px;
+            align-items: center;
+        }
+
+        .meta-label {
+            color: var(--text-secondary);
+        }
+
+        .meta-val {
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        /* Form Controls */
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .field-label {
+            color: var(--text-primary);
+            font-size: 9pt;
+        }
+
+        select, input[type="number"] {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 6px 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 9pt;
+            outline: none;
+            width: 100%;
+        }
+
+        select:focus, input[type="number"]:focus {
+            border-color: rgba(0, 229, 255, 0.5);
+        }
+
+        select option {
+            background-color: #161622;
+            color: var(--text-primary);
+        }
+
+        /* Channel ListWidget equivalent */
+        .channel-list {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 6px;
+            height: 120px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            color: var(--text-primary);
+        }
+
+        .channel-item:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .channel-item input[type="checkbox"] {
+            accent-color: var(--accent-cyan);
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+
+        /* Right Display Stack */
+        .display-stack {
+            flex: 1;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Empty State Page */
+        .empty-widget {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            font-size: 48pt;
+            color: var(--text-muted);
+            line-height: 1;
+        }
+
+        .empty-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: var(--text-secondary);
+        }
+
+        .empty-desc {
+            font-size: 10pt;
+            color: var(--text-muted);
+            max-width: 400px;
+            line-height: 1.45;
+        }
+
+        /* Dynamic Charts Scroll Area */
+        .scroll-area {
+            flex: 1;
+            overflow: auto;
+            display: none;
+            padding-right: 2px;
+        }
+
+        .charts-grid {
+            display: grid;
+            gap: 15px;
+            min-height: 100%;
+            align-content: stretch;
+        }
+
+        /* ChartCard Component */
+        .chart-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 420px;
+            min-height: 360px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title {
+            font-weight: bold;
+            font-size: 10pt;
+            color: var(--text-primary);
+            margin-right: auto;
+        }
+
+        .scale-label {
+            color: var(--text-primary);
+            font-size: 9pt;
+        }
+
+        .scale-select {
+            width: 130px;
+            padding: 4px 8px;
+            font-size: 8.5pt;
+        }
+
+        .metrics-row {
+            font-size: 9pt;
+            color: var(--text-secondary);
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            background-color: #1e1e2d;
+            border-radius: 6px;
+            overflow: hidden;
+            min-height: 270px;
+        }
+
+        .chart-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Custom Scrollbars matching QScrollBar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            min-height: 20px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-cyan);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ========================================== -->
+        <!-- LEFT CONTROL PANEL                         -->
+        <!-- ========================================== -->
+        <aside class="control-panel" id="controlPanel">
+            <!-- Logo Area -->
+            <div class="logo-widget">
+                <div class="lbl-logo">📊 Compressor Analysis</div>
+                <div class="lbl-sub">Vibration Signal Processing &amp; FFT Diagnostics</div>
+            </div>
+
+            <!-- 1. File Upload Group -->
+            <div class="group-box">
+                <div class="group-box-title">1. Select Input Data</div>
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                <button type="button" class="btn-primary" id="btnLoadCsv">Choose CSV File</button>
+                <div class="active-file-label" id="lblActiveFile">No active file loaded.</div>
+            </div>
+
+            <!-- 2. File Information Group (Metadata) -->
+            <div class="group-box hidden" id="metaGroup">
+                <div class="group-box-title">2. File Information</div>
+                <div class="meta-grid">
+                    <span class="meta-label">Total Samples:</span>
+                    <span class="meta-val" id="lblValSamples">-</span>
+                    <span class="meta-label">Duration:</span>
+                    <span class="meta-val" id="lblValDuration">-</span>
+                    <span class="meta-label">Sampling Rate:</span>
+                    <span class="meta-val" id="lblValFs">-</span>
+                </div>
+            </div>
+
+            <!-- 3. Parameters Group -->
+            <div class="group-box">
+                <div class="group-box-title">3. Analysis Configuration</div>
+
+                <div class="field-group">
+                    <label class="field-label" for="comboTimeCol">Time Column:</label>
+                    <select id="comboTimeCol"></select>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Vibration Channels:</label>
+                    <div class="channel-list" id="listChannels"></div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="spinStartTime">Start Time (sec):</label>
+                    <input type="number" id="spinStartTime" min="0.0" max="100000.0" step="0.1" value="15.0">
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="spinDuration">Analysis Duration (sec):</label>
+                    <input type="number" id="spinDuration" min="0.1" max="100000.0" step="0.1" value="2.0">
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="spinMaxFreq">Max FFT Frequency (Hz):</label>
+                    <input type="number" id="spinMaxFreq" min="1" max="100000" step="1" value="200">
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="spinSigma">Gaussian Filter Sigma (σ):</label>
+                    <input type="number" id="spinSigma" min="0.0" max="100.0" step="0.05" value="0.50">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <button type="button" class="btn-primary btn-analyze" id="btnAnalyze" disabled>⚡ Run Diagnostics</button>
+            <button type="button" class="btn-secondary btn-export" id="btnExportData" disabled>📥 Export FFT Data</button>
+            <button type="button" class="btn-secondary btn-export" id="btnExportImages" disabled>📷 Export Graphs (JPG)</button>
+        </aside>
+
+        <!-- Splitter Handle -->
+        <div class="splitter-handle" id="splitterHandle"></div>
+
+        <!-- ========================================== -->
+        <!-- RIGHT DISPLAY STACK                        -->
+        <!-- ========================================== -->
+        <main class="display-stack">
+            <!-- 1. Empty State Page -->
+            <div class="empty-widget" id="emptyWidget">
+                <div class="empty-icon">📈</div>
+                <div class="empty-title">No Signal Loaded</div>
+                <div class="empty-desc">
+                    Please choose a vibration CSV file on the left sidebar and configure parameters to compute diagnostic spectra.
+                </div>
+            </div>
+
+            <!-- 2. Dynamic Charts Scroll Area -->
+            <div class="scroll-area" id="scrollArea">
+                <div class="charts-grid" id="chartsGrid"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // Core Mathematical Algorithms (Matching Numpy)
+        // ==========================================
+
+        /**
+         * 1D Gaussian Filter with Reflective Boundary Conditions.
+         * Exact match to gaussian_filter_1d(arr, sigma) in 01_FFT_GUI_Analyzer_1.py.
+         */
+        function gaussianFilter1d(arr, sigma) {
+            if (sigma <= 0) {
+                return Float64Array.from(arr);
+            }
+            const radius = Math.ceil(4 * sigma);
+            const kernelLen = 2 * radius + 1;
+            const kernel = new Float64Array(kernelLen);
+            let sum = 0.0;
+            for (let i = -radius; i <= radius; i++) {
+                const val = Math.exp(-(i * i) / (2 * sigma * sigma));
+                kernel[i + radius] = val;
+                sum += val;
+            }
+            for (let i = 0; i < kernelLen; i++) {
+                kernel[i] /= sum;
+            }
+
+            const L = arr.length;
+            const result = new Float64Array(L);
+            for (let i = 0; i < L; i++) {
+                let val = 0.0;
+                for (let j = -radius; j <= radius; j++) {
+                    let idx = i + j;
+                    if (idx < 0) {
+                        idx = -idx; // reflect at left
+                    } else if (idx >= L) {
+                        idx = 2 * L - 2 - idx; // reflect at right
+                    }
+                    if (idx < 0) idx = 0;
+                    if (idx >= L) idx = L - 1;
+                    val += arr[idx] * kernel[j + radius];
+                }
+                result[i] = val;
+            }
+            return result;
+        }
+
+        /**
+         * In-place Radix-2 Cooley-Tukey FFT for power-of-2 length arrays.
+         */
+        function fftRadix2(re, im, invert) {
+            const n = re.length;
+            for (let i = 1, j = 0; i < n; i++) {
+                let bit = n >> 1;
+                for (; j & bit; bit >>= 1) {
+                    j ^= bit;
+                }
+                j ^= bit;
+                if (i < j) {
+                    const tmpRe = re[i]; re[i] = re[j]; re[j] = tmpRe;
+                    const tmpIm = im[i]; im[i] = im[j]; im[j] = tmpIm;
+                }
+            }
+
+            for (let len = 2; len <= n; len <<= 1) {
+                const halfLen = len >> 1;
+                const angle = (2 * Math.PI / len) * (invert ? 1 : -1);
+                const wlenRe = Math.cos(angle);
+                const wlenIm = Math.sin(angle);
+                for (let i = 0; i < n; i += len) {
+                    let wRe = 1.0;
+                    let wIm = 0.0;
+                    for (let j = 0; j < halfLen; j++) {
+                        const uRe = re[i + j];
+                        const uIm = im[i + j];
+                        const vRe = re[i + j + halfLen] * wRe - im[i + j + halfLen] * wIm;
+                        const vIm = re[i + j + halfLen] * wIm + im[i + j + halfLen] * wRe;
+                        re[i + j] = uRe + vRe;
+                        im[i + j] = uIm + vIm;
+                        re[i + j + halfLen] = uRe - vRe;
+                        im[i + j + halfLen] = uIm - vIm;
+                        const nextWRe = wRe * wlenRe - wIm * wlenIm;
+                        wIm = wRe * wlenIm + wIm * wlenRe;
+                        wRe = nextWRe;
+                    }
+                }
+            }
+
+            if (invert) {
+                for (let i = 0; i < n; i++) {
+                    re[i] /= n;
+                    im[i] /= n;
+                }
+            }
+        }
+
+        /**
+         * Exact Arbitrary-Length FFT using Bluestein's Chirp-Z Algorithm.
+         * Matches numpy.fft.fft(input) for any N (power-of-2 or non-power-of-2 like 10240) in O(N log N).
+         */
+        function fftArbitrary(inputReal) {
+            const n = inputReal.length;
+            if (n === 0) return { re: new Float64Array(0), im: new Float64Array(0) };
+            if ((n & (n - 1)) === 0) {
+                const re = Float64Array.from(inputReal);
+                const im = new Float64Array(n);
+                fftRadix2(re, im, false);
+                return { re, im };
+            }
+
+            let m = 1;
+            while (m < 2 * n - 1) {
+                m <<= 1;
+            }
+
+            const aRe = new Float64Array(m);
+            const aIm = new Float64Array(m);
+            const bRe = new Float64Array(m);
+            const bIm = new Float64Array(m);
+            const chirpRe = new Float64Array(n);
+            const chirpIm = new Float64Array(n);
+
+            for (let k = 0; k < n; k++) {
+                // (k * k) % (2 * n) avoids precision loss for large k
+                const modSq = (k * k) % (2 * n);
+                const angle = (Math.PI * modSq) / n;
+                const c = Math.cos(angle);
+                const s = Math.sin(angle);
+                chirpRe[k] = c;
+                chirpIm[k] = -s;
+
+                aRe[k] = inputReal[k] * chirpRe[k];
+                aIm[k] = inputReal[k] * chirpIm[k];
+
+                bRe[k] = c;
+                bIm[k] = s;
+                if (k > 0) {
+                    bRe[m - k] = c;
+                    bIm[m - k] = s;
+                }
+            }
+
+            fftRadix2(aRe, aIm, false);
+            fftRadix2(bRe, bIm, false);
+
+            for (let i = 0; i < m; i++) {
+                const tr = aRe[i] * bRe[i] - aIm[i] * bIm[i];
+                const ti = aRe[i] * bIm[i] + aIm[i] * bRe[i];
+                aRe[i] = tr;
+                aIm[i] = ti;
+            }
+
+            fftRadix2(aRe, aIm, true);
+
+            const outRe = new Float64Array(n);
+            const outIm = new Float64Array(n);
+            for (let k = 0; k < n; k++) {
+                outRe[k] = aRe[k] * chirpRe[k] - aIm[k] * chirpIm[k];
+                outIm[k] = aRe[k] * chirpIm[k] + aIm[k] * chirpRe[k];
+            }
+            return { re: outRe, im: outIm };
+        }
+
+        /**
+         * Calculates FFT with Hamming Window and RMS Magnitude Correction.
+         * Exact match to compute_fft(signal, sampling_rate, num_samples) in 01_FFT_GUI_Analyzer_1.py.
+         */
+        function computeFft(signal, samplingRate, numSamples) {
+            const N = signal.length;
+            const windowed = new Float64Array(N);
+
+            let sumSq = 0.0;
+            let sumAbs = 0.0;
+
+            for (let i = 0; i < N; i++) {
+                const w = N > 1 ? (0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (N - 1))) : 1.0;
+                const val = signal[i] * w;
+                windowed[i] = val;
+                sumSq += val * val;
+                sumAbs += Math.abs(val);
+            }
+
+            const signalRms = Math.sqrt(sumSq / N);
+            const meanAbs = sumAbs / N;
+            const signalRatio = meanAbs > 0 ? (signalRms / meanAbs) : 1.0;
+
+            const fftInput = new Float64Array(numSamples);
+            const copyLen = Math.min(N, numSamples);
+            for (let i = 0; i < copyLen; i++) {
+                fftInput[i] = windowed[i];
+            }
+
+            const { re, im } = fftArbitrary(fftInput);
+
+            const halfSize = Math.floor(numSamples / 2);
+            const magXk1 = new Float64Array(halfSize);
+            const frequencies = new Float64Array(halfSize);
+
+            for (let k = 0; k < halfSize; k++) {
+                const absVal = Math.hypot(re[k], im[k]);
+                let mag = (absVal / N) * signalRatio;
+                if (k >= 1) {
+                    mag *= 2.0;
+                }
+                magXk1[k] = mag;
+                frequencies[k] = (k * samplingRate) / numSamples;
+            }
+
+            return {
+                frequencies,
+                mag: magXk1,
+                signalRms,
+                signalRatio
+            };
+        }
+
+        // ==========================================
+        // Matplotlib-Style Canvas Renderer & Exporter
+        // ==========================================
+
+        function computeNiceTicks(minVal, maxVal, maxTicks = 6) {
+            if (!isFinite(minVal) || !isFinite(maxVal)) return [0, 1];
+            if (Math.abs(maxVal - minVal) < 1e-12) {
+                return [minVal - 1, minVal, minVal + 1];
+            }
+            const range = maxVal - minVal;
+            const roughStep = range / Math.max(1, maxTicks - 1);
+            const mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
+            const residual = roughStep / mag;
+            let step;
+            if (residual > 5) step = 10 * mag;
+            else if (residual > 2.5) step = 5 * mag;
+            else if (residual > 2) step = 2.5 * mag;
+            else if (residual > 1) step = 2 * mag;
+            else step = mag;
+
+            const first = Math.ceil(minVal / step - 1e-9) * step;
+            const ticks = [];
+            for (let v = first; v <= maxVal + step * 1e-9; v += step) {
+                ticks.push(Math.abs(v) < 1e-12 ? 0 : v);
+            }
+            return ticks;
+        }
+
+        function formatTickValue(val, stepHint) {
+            if (Math.abs(val) < 1e-12) return "0";
+            const absStep = Math.abs(stepHint || val);
+            if (absStep >= 1) return Number(val.toFixed(2)).toString();
+            if (absStep >= 0.1) return Number(val.toFixed(2)).toString();
+            if (absStep >= 0.01) return Number(val.toFixed(3)).toString();
+            if (absStep >= 0.001) return Number(val.toFixed(4)).toString();
+            return val.toExponential(1);
+        }
+
+        function drawRoundedRect(ctx, x, y, w, h, r) {
+            const radius = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + w - radius, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+            ctx.lineTo(x + w, y + h - radius);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+            ctx.lineTo(x + radius, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        /**
+         * Draws a Matplotlib-style annotation box + arrow pointing to target (px, py)
+         */
+        function drawAnnotation(ctx, text, targetX, targetY, offsetX, offsetY, color, plotRect, isExport) {
+            ctx.save();
+            const fontSize = isExport ? 13 : 11;
+            ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+            const metrics = ctx.measureText(text);
+            const padX = isExport ? 8 : 6;
+            const padY = isExport ? 5 : 4;
+            const boxW = metrics.width + padX * 2;
+            const boxH = fontSize + padY * 2;
+
+            // Clamp box inside plot area so it never clips off-screen
+            let boxCenterX = targetX + offsetX;
+            let boxCenterY = targetY + offsetY;
+
+            const margin = 6;
+            if (boxCenterX - boxW / 2 < plotRect.x + margin) {
+                boxCenterX = plotRect.x + margin + boxW / 2;
+            }
+            if (boxCenterX + boxW / 2 > plotRect.x + plotRect.w - margin) {
+                boxCenterX = plotRect.x + plotRect.w - margin - boxW / 2;
+            }
+            if (boxCenterY - boxH / 2 < plotRect.y + margin) {
+                boxCenterY = targetY + Math.abs(offsetY) + boxH / 2;
+            }
+            if (boxCenterY + boxH / 2 > plotRect.y + plotRect.h - margin) {
+                boxCenterY = targetY - Math.abs(offsetY) - boxH / 2;
+            }
+
+            const boxX = boxCenterX - boxW / 2;
+            const boxY = boxCenterY - boxH / 2;
+
+            // Arrow start point from edge of box closest to target
+            const startX = Math.max(boxX, Math.min(targetX, boxX + boxW));
+            const startY = boxCenterY < targetY ? (boxY + boxH) : boxY;
+
+            const dx = targetX - startX;
+            const dy = targetY - startY;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > 4) {
+                const endX = targetX - (dx / dist) * 2;
+                const endY = targetY - (dy / dist) * 2;
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = isExport ? 1.8 : 1.3;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+
+                // Arrowhead
+                const angle = Math.atan2(endY - startY, endX - startX);
+                const headLen = isExport ? 8 : 6;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(endX, endY);
+                ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Box background & border
+            ctx.fillStyle = "rgba(12, 12, 20, 0.85)";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isExport ? 1.5 : 1.2;
+            drawRoundedRect(ctx, boxX, boxY, boxW, boxH, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // Text
+            ctx.fillStyle = color;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, boxCenterX, boxCenterY + 0.5);
+            ctx.restore();
+        }
+
+        /**
+         * Renders either Time Domain or Frequency Domain chart onto a canvas context.
+         * Supports both interactive on-screen rendering and 1200x600 off-screen JPG export.
+         */
+        function renderChartOnContext(ctx, width, height, config) {
+            const { isFreq, channel, data, scaleMode, isExport } = config;
+
+            // Outer figure background
+            ctx.fillStyle = isExport ? "#1a1a2e" : "#1e1e2d";
+            ctx.fillRect(0, 0, width, height);
+
+            const padLeft = isExport ? 82 : 64;
+            const padRight = isExport ? 32 : 20;
+            const padTop = isExport ? 48 : 18;
+            const padBottom = isExport ? 58 : 44;
+
+            const plotRect = {
+                x: padLeft,
+                y: padTop,
+                w: Math.max(50, width - padLeft - padRight),
+                h: Math.max(50, height - padTop - padBottom)
+            };
+
+            // Axes canvas background (#0a0a0f)
+            ctx.fillStyle = "#0a0a0f";
+            ctx.fillRect(plotRect.x, plotRect.y, plotRect.w, plotRect.h);
+
+            // Title for exported image
+            if (isExport) {
+                ctx.fillStyle = "#f1f5f9";
+                ctx.font = 'bold 16px "Segoe UI", sans-serif';
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                const titleText = !isFreq ? `Time Domain - ${channel}` : `Frequency Domain (FFT) - ${channel}`;
+                ctx.fillText(titleText, plotRect.x + plotRect.w / 2, padTop / 2);
+            }
+
+            let xArr, yArr, xLabel, yLabel, lineColor;
+            let yMinPlot, yMaxPlot;
+
+            if (!isFreq) {
+                xArr = data.time;
+                yArr = data.signal;
+                xLabel = "Time (seconds)";
+                yLabel = "Acceleration (g)";
+                lineColor = "#00e5ff";
+
+                let minV = Infinity, maxV = -Infinity;
+                for (let i = 0; i < yArr.length; i++) {
+                    if (yArr[i] < minV) minV = yArr[i];
+                    if (yArr[i] > maxV) maxV = yArr[i];
+                }
+                const span = (maxV - minV) > 0 ? (maxV - minV) : 1.0;
+                // Add generous headroom so Max/Min annotations stay well inside plot
+                yMinPlot = minV - span * 0.18;
+                yMaxPlot = maxV + span * 0.18;
+            } else {
+                xArr = data.freqs;
+                const mag = data.mag;
+                lineColor = "#7c4dff";
+                xLabel = "Frequency (Hz)";
+
+                if (scaleMode === "dB") {
+                    yArr = new Float64Array(mag.length);
+                    for (let i = 0; i < mag.length; i++) {
+                        yArr[i] = 20 * Math.log10(Math.max(mag[i], 1e-12) / 1e-5);
+                    }
+                    yLabel = "Amplitude (dB ref 10⁻⁵)";
+                } else {
+                    yArr = mag;
+                    yLabel = "Magnitude (g RMS)";
+                }
+
+                let minV = Infinity, maxV = -Infinity;
+                for (let i = 0; i < yArr.length; i++) {
+                    if (yArr[i] < minV) minV = yArr[i];
+                    if (yArr[i] > maxV) maxV = yArr[i];
+                }
+                const pad = (maxV - minV) > 0 ? (maxV - minV) * 0.15 : 0.1;
+                yMinPlot = scaleMode === "dB" ? (minV - pad) : 0;
+                yMaxPlot = maxV + pad;
+            }
+
+            if (!xArr || xArr.length === 0) return;
+
+            let xMin = xArr[0];
+            let xMax = xArr[xArr.length - 1];
+            if (!isFreq) {
+                const xSpan = xMax - xMin || 1.0;
+                xMin -= xSpan * 0.03;
+                xMax += xSpan * 0.03;
+            } else {
+                const xSpan = xMax - xMin || 1.0;
+                xMin -= xSpan * 0.02;
+                xMax += xSpan * 0.04;
+            }
+
+            const mapX = (val) => plotRect.x + ((val - xMin) / (xMax - xMin)) * plotRect.w;
+            const mapY = (val) => plotRect.y + plotRect.h - ((val - yMinPlot) / (yMaxPlot - yMinPlot)) * plotRect.h;
+
+            // Grid & Ticks
+            const xTicks = computeNiceTicks(xMin, xMax, 7);
+            const yTicks = computeNiceTicks(yMinPlot, yMaxPlot, 6);
+            const xStep = xTicks.length > 1 ? (xTicks[1] - xTicks[0]) : 1;
+            const yStep = yTicks.length > 1 ? (yTicks[1] - yTicks[0]) : 1;
+
+            ctx.save();
+            ctx.strokeStyle = "rgba(46, 46, 61, 0.65)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+
+            for (const xt of xTicks) {
+                const px = mapX(xt);
+                if (px >= plotRect.x && px <= plotRect.x + plotRect.w) {
+                    ctx.beginPath();
+                    ctx.moveTo(px, plotRect.y);
+                    ctx.lineTo(px, plotRect.y + plotRect.h);
+                    ctx.stroke();
+                }
+            }
+            for (const yt of yTicks) {
+                const py = mapY(yt);
+                if (py >= plotRect.y && py <= plotRect.y + plotRect.h) {
+                    ctx.beginPath();
+                    ctx.moveTo(plotRect.x, py);
+                    ctx.lineTo(plotRect.x + plotRect.w, py);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            // Plot curve clipped to plotRect
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(plotRect.x, plotRect.y, plotRect.w, plotRect.h);
+            ctx.clip();
+
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = isExport ? 1.5 : 1.2;
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            for (let i = 0; i < xArr.length; i++) {
+                const px = mapX(xArr[i]);
+                const py = mapY(yArr[i]);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+
+            // Annotations inside plot
+            if (!isFreq) {
+                let maxIdx = 0, minIdx = 0;
+                for (let i = 1; i < yArr.length; i++) {
+                    if (yArr[i] > yArr[maxIdx]) maxIdx = i;
+                    if (yArr[i] < yArr[minIdx]) minIdx = i;
+                }
+                const maxPx = mapX(xArr[maxIdx]);
+                const maxPy = mapY(yArr[maxIdx]);
+                const minPx = mapX(xArr[minIdx]);
+                const minPy = mapY(yArr[minIdx]);
+
+                drawAnnotation(
+                    ctx,
+                    `Max: ${yArr[maxIdx].toFixed(3)}`,
+                    maxPx,
+                    maxPy,
+                    0,
+                    isExport ? -36 : -28,
+                    "#00e676",
+                    plotRect,
+                    isExport
+                );
+                drawAnnotation(
+                    ctx,
+                    `Min: ${yArr[minIdx].toFixed(3)}`,
+                    minPx,
+                    minPy,
+                    0,
+                    isExport ? 36 : 28,
+                    "#ff1744",
+                    plotRect,
+                    isExport
+                );
+            } else {
+                if (yArr.length > 1) {
+                    let maxIdx = 1;
+                    for (let i = 2; i < yArr.length; i++) {
+                        if (yArr[i] > yArr[maxIdx]) maxIdx = i;
+                    }
+                    const peakPx = mapX(xArr[maxIdx]);
+                    const peakPy = mapY(yArr[maxIdx]);
+                    drawAnnotation(
+                        ctx,
+                        `1X Peak: ${xArr[maxIdx].toFixed(2)} Hz`,
+                        peakPx,
+                        peakPy,
+                        isExport ? 65 : 52,
+                        isExport ? -34 : -26,
+                        "#7c4dff",
+                        plotRect,
+                        isExport
+                    );
+                }
+            }
+
+            ctx.restore();
+
+            // Border Spines (#2e2e3d)
+            ctx.strokeStyle = "#2e2e3d";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(plotRect.x, plotRect.y, plotRect.w, plotRect.h);
+
+            // Tick Labels (#64748b)
+            const tickFontSize = isExport ? 12 : 10.5;
+            ctx.font = `${tickFontSize}px "Segoe UI", sans-serif`;
+            ctx.fillStyle = "#64748b";
+
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            for (const xt of xTicks) {
+                const px = mapX(xt);
+                if (px >= plotRect.x - 2 && px <= plotRect.x + plotRect.w + 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(px, plotRect.y + plotRect.h);
+                    ctx.lineTo(px, plotRect.y + plotRect.h + 4);
+                    ctx.stroke();
+                    ctx.fillText(formatTickValue(xt, xStep), px, plotRect.y + plotRect.h + 6);
+                }
+            }
+
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            for (const yt of yTicks) {
+                const py = mapY(yt);
+                if (py >= plotRect.y - 2 && py <= plotRect.y + plotRect.h + 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(plotRect.x - 4, py);
+                    ctx.lineTo(plotRect.x, py);
+                    ctx.stroke();
+                    ctx.fillText(formatTickValue(yt, yStep), plotRect.x - 7, py);
+                }
+            }
+
+            // Axis Labels (#94a3b8)
+            const labelFontSize = isExport ? 13 : 11.5;
+            ctx.font = `${labelFontSize}px "Segoe UI", sans-serif`;
+            ctx.fillStyle = "#94a3b8";
+
+            // X-axis label
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText(xLabel, plotRect.x + plotRect.w / 2, height - (isExport ? 8 : 5));
+
+            // Y-axis label (rotated)
+            ctx.save();
+            ctx.translate(isExport ? 18 : 14, plotRect.y + plotRect.h / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.fillText(yLabel, 0, 0);
+            ctx.restore();
+        }
+
+        function exportChartAsJpg(filename, isFreq, channel, data, scaleMode) {
+            const offCanvas = document.createElement("canvas");
+            offCanvas.width = 1200;
+            offCanvas.height = 600;
+            const ctx = offCanvas.getContext("2d");
+            renderChartOnContext(ctx, 1200, 600, {
+                isFreq,
+                channel,
+                data,
+                scaleMode,
+                isExport: true
+            });
+
+            offCanvas.toBlob((blob) => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }, "image/jpeg", 0.95);
+        }
+
+        // ==========================================
+        // ChartCard Component Class
+        // ==========================================
+
+        class ChartCard {
+            constructor(title, isFreq, channel, appState) {
+                this.title = title;
+                this.isFreq = isFreq;
+                this.channel = channel;
+                this.appState = appState;
+                this.scaleMode = "linear";
+                this.data = null;
+
+                this.element = this.createDOM();
+            }
+
+            createDOM() {
+                const card = document.createElement("div");
+                card.className = "chart-card";
+
+                // Header Row
+                const header = document.createElement("div");
+                header.className = "card-header";
+
+                const lblTitle = document.createElement("div");
+                lblTitle.className = "card-title";
+                lblTitle.textContent = this.title;
+                header.appendChild(lblTitle);
+
+                if (this.isFreq) {
+                    const lblScale = document.createElement("span");
+                    lblScale.className = "scale-label";
+                    lblScale.textContent = "Scale:";
+                    header.appendChild(lblScale);
+
+                    this.comboScale = document.createElement("select");
+                    this.comboScale.className = "scale-select";
+                    const optLinear = document.createElement("option");
+                    optLinear.value = "linear";
+                    optLinear.textContent = "LINEAR";
+                    const optDb = document.createElement("option");
+                    optDb.value = "dB";
+                    optDb.textContent = "dB (Ref 10⁻⁵)";
+                    this.comboScale.appendChild(optLinear);
+                    this.comboScale.appendChild(optDb);
+
+                    this.comboScale.addEventListener("change", () => {
+                        this.scaleMode = this.comboScale.value;
+                        this.updatePlot();
+                    });
+                    header.appendChild(this.comboScale);
+                }
+
+                const btnSave = document.createElement("button");
+                btnSave.type = "button";
+                btnSave.className = "btn-secondary btn-save-jpg";
+                btnSave.textContent = "📷 Save JPG";
+                btnSave.addEventListener("click", () => this.saveAsJpg());
+                header.appendChild(btnSave);
+
+                card.appendChild(header);
+
+                // Metrics Row
+                this.lblMetrics = document.createElement("div");
+                this.lblMetrics.className = "metrics-row";
+                card.appendChild(this.lblMetrics);
+
+                // Canvas Wrapper
+                this.canvasWrapper = document.createElement("div");
+                this.canvasWrapper.className = "canvas-wrapper";
+                this.canvas = document.createElement("canvas");
+                this.canvas.className = "chart-canvas";
+                this.canvasWrapper.appendChild(this.canvas);
+                card.appendChild(this.canvasWrapper);
+
+                // ResizeObserver for crisp redraws
+                this.resizeObserver = new ResizeObserver(() => {
+                    this.drawCanvas();
+                });
+                this.resizeObserver.observe(this.canvasWrapper);
+
+                return card;
+            }
+
+            setData(data) {
+                this.data = data;
+                this.updatePlot();
+            }
+
+            updatePlot() {
+                if (!this.data) return;
+
+                if (!this.isFreq) {
+                    const signal = this.data.signal;
+                    let maxVal = -Infinity, minVal = Infinity;
+                    for (let i = 0; i < signal.length; i++) {
+                        if (signal[i] > maxVal) maxVal = signal[i];
+                        if (signal[i] < minVal) minVal = signal[i];
+                    }
+                    this.lblMetrics.innerHTML =
+                        `📈 Max Acceleration: <span style="color:#00e676;"><b>${maxVal.toFixed(4)} g</b></span> | ` +
+                        `Min Acceleration: <span style="color:#ff1744;"><b>${minVal.toFixed(4)} g</b></span>`;
+                } else {
+                    const { freq1x, mag1x, overallAcc } = this.data;
+                    let val1xStr, valOaStr;
+                    if (this.scaleMode === "dB") {
+                        const db1x = 20 * Math.log10(Math.max(mag1x, 1e-12) / 1e-5);
+                        const dbOa = 20 * Math.log10(Math.max(overallAcc, 1e-12) / 1e-5);
+                        val1xStr = `${db1x.toFixed(1)} dB`;
+                        valOaStr = `${dbOa.toFixed(1)} dB`;
+                    } else {
+                        val1xStr = `${mag1x.toFixed(5)} g`;
+                        valOaStr = `${overallAcc.toFixed(5)} g`;
+                    }
+                    this.lblMetrics.innerHTML =
+                        `⚡ 1X Frequency: <span style="color:#7c4dff;"><b>${freq1x.toFixed(2)} Hz</b></span> | ` +
+                        `1X Mag: <span style="color:#7c4dff;"><b>${val1xStr}</b></span> | ` +
+                        `Overall Acc: <span style="color:#00e5ff;"><b>${valOaStr}</b></span>`;
+                }
+
+                this.drawCanvas();
+            }
+
+            drawCanvas() {
+                if (!this.data) return;
+                const rect = this.canvasWrapper.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return;
+
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = Math.round(rect.width * dpr);
+                this.canvas.height = Math.round(rect.height * dpr);
+
+                const ctx = this.canvas.getContext("2d");
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                renderChartOnContext(ctx, rect.width, rect.height, {
+                    isFreq: this.isFreq,
+                    channel: this.channel,
+                    data: this.data,
+                    scaleMode: this.scaleMode,
+                    isExport: false
+                });
+            }
+
+            saveAsJpg() {
+                if (!this.data) return;
+                let defaultFilename = !this.isFreq
+                    ? `${this.channel}_Time_Domain.jpg`
+                    : `${this.channel}_Frequency_Spectrum.jpg`;
+                if (this.appState.fileName) {
+                    const base = this.appState.fileName.replace(/\.csv$/i, "");
+                    defaultFilename = `${base}_${defaultFilename}`;
+                }
+                exportChartAsJpg(defaultFilename, this.isFreq, this.channel, this.data, this.scaleMode);
+            }
+
+            destroy() {
+                if (this.resizeObserver) {
+                    this.resizeObserver.disconnect();
+                }
+            }
+        }
+
+        // ==========================================
+        // Main Dashboard Application Controller
+        // ==========================================
+
+        const appState = {
+            headers: [],
+            columnsData: {}, // { colName: Float64Array }
+            fileName: "",
+            totalSamples: 0,
+            totalDuration: 0.0,
+            samplingRate: 0,
+            analysisResults: null,
+            activeCards: []
+        };
+
+        // DOM Elements
+        const csvFileInput = document.getElementById("csvFileInput");
+        const btnLoadCsv = document.getElementById("btnLoadCsv");
+        const lblActiveFile = document.getElementById("lblActiveFile");
+        const metaGroup = document.getElementById("metaGroup");
+        const lblValSamples = document.getElementById("lblValSamples");
+        const lblValDuration = document.getElementById("lblValDuration");
+        const lblValFs = document.getElementById("lblValFs");
+        const comboTimeCol = document.getElementById("comboTimeCol");
+        const listChannels = document.getElementById("listChannels");
+        const spinStartTime = document.getElementById("spinStartTime");
+        const spinDuration = document.getElementById("spinDuration");
+        const spinMaxFreq = document.getElementById("spinMaxFreq");
+        const spinSigma = document.getElementById("spinSigma");
+        const btnAnalyze = document.getElementById("btnAnalyze");
+        const btnExportData = document.getElementById("btnExportData");
+        const btnExportImages = document.getElementById("btnExportImages");
+        const emptyWidget = document.getElementById("emptyWidget");
+        const scrollArea = document.getElementById("scrollArea");
+        const chartsGrid = document.getElementById("chartsGrid");
+
+        // Splitter Resizing
+        const splitterHandle = document.getElementById("splitterHandle");
+        const controlPanel = document.getElementById("controlPanel");
+        let isDraggingSplitter = false;
+
+        splitterHandle.addEventListener("mousedown", () => {
+            isDraggingSplitter = true;
+            splitterHandle.classList.add("dragging");
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!isDraggingSplitter) return;
+            const newWidth = Math.max(340, Math.min(520, e.clientX - 15));
+            controlPanel.style.width = `${newWidth}px`;
+        });
+
+        window.addEventListener("mouseup", () => {
+            if (isDraggingSplitter) {
+                isDraggingSplitter = false;
+                splitterHandle.classList.remove("dragging");
+                document.body.style.cursor = "";
+                document.body.style.userSelect = "";
+            }
+        });
+
+        // File Loading
+        btnLoadCsv.addEventListener("click", () => {
+            csvFileInput.value = "";
+            csvFileInput.click();
+        });
+
+        csvFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            loadCsvFile(file);
+        });
+
+        function loadCsvFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const text = event.target.result;
+                    parseCsvContent(text, file.name);
+                } catch (err) {
+                    alert("Failed to load CSV file:\n" + err.message);
+                }
+            };
+            reader.onerror = () => {
+                alert("Failed to read file.");
+            };
+            reader.readAsText(file, "utf-8");
+        }
+
+        function parseCsvContent(csvText, fileName) {
+            const lines = csvText.split(/\r?\n/);
+            let headerLineIdx = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().length > 0) {
+                    headerLineIdx = i;
+                    break;
+                }
+            }
+            if (headerLineIdx === -1) {
+                throw new Error("CSV file is empty.");
+            }
+
+            const rawHeaders = lines[headerLineIdx].replace(/^\uFEFF/, "").split(",").map(h => h.trim());
+            if (rawHeaders.length < 2) {
+                throw new Error("CSV file must contain at least 2 columns.");
+            }
+
+            const numCols = rawHeaders.length;
+            const tempCols = Array.from({ length: numCols }, () => []);
+
+            for (let i = headerLineIdx + 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const parts = line.split(",");
+                if (parts.length < numCols) continue;
+                let validRow = true;
+                const vals = new Array(numCols);
+                for (let c = 0; c < numCols; c++) {
+                    const v = parseFloat(parts[c]);
+                    if (Number.isNaN(v)) {
+                        validRow = false;
+                        break;
+                    }
+                    vals[c] = v;
+                }
+                if (validRow) {
+                    for (let c = 0; c < numCols; c++) {
+                        tempCols[c].push(vals[c]);
+                    }
+                }
+            }
+
+            const rowCount = tempCols[0].length;
+            if (rowCount === 0) {
+                throw new Error("No valid numeric data rows found in CSV file.");
+            }
+
+            appState.headers = rawHeaders;
+            appState.columnsData = {};
+            for (let c = 0; c < numCols; c++) {
+                appState.columnsData[rawHeaders[c]] = Float64Array.from(tempCols[c]);
+            }
+            appState.fileName = fileName;
+
+            processCsvMetadata();
+
+            // Update UI state
+            lblActiveFile.textContent = appState.fileName;
+            lblActiveFile.classList.add("loaded");
+            btnAnalyze.disabled = false;
+            metaGroup.classList.remove("hidden");
+        }
+
+        function processCsvMetadata() {
+            const headers = appState.headers;
+            const timeCol = headers.find(h => h.toLowerCase() === "time") || headers[0];
+
+            comboTimeCol.innerHTML = "";
+            for (const h of headers) {
+                const opt = document.createElement("option");
+                opt.value = h;
+                opt.textContent = h;
+                if (h === timeCol) opt.selected = true;
+                comboTimeCol.appendChild(opt);
+            }
+
+            updateMetaLabels(timeCol);
+        }
+
+        function updateMetaLabels(timeCol) {
+            const times = appState.columnsData[timeCol];
+            if (!times || times.length === 0) return;
+
+            appState.totalSamples = times.length;
+            appState.totalDuration = times[times.length - 1];
+            appState.samplingRate = Math.round(appState.totalSamples / appState.totalDuration);
+
+            lblValSamples.textContent = appState.totalSamples.toLocaleString("en-US");
+            lblValDuration.textContent = `${appState.totalDuration.toFixed(3)} s`;
+            lblValFs.textContent = `${appState.samplingRate.toLocaleString("en-US")} Hz`;
+
+            spinStartTime.max = Math.max(0.0, appState.totalDuration - 0.1).toFixed(1);
+            spinDuration.max = appState.totalDuration.toFixed(1);
+
+            // Populate channel checkbox list
+            listChannels.innerHTML = "";
+            const channels = appState.headers.filter(h => h !== timeCol);
+            for (const ch of channels) {
+                const label = document.createElement("label");
+                label.className = "channel-item";
+
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.value = ch;
+                if (ch === "CH11" || ch === "CH12" || channels.length <= 2) {
+                    checkbox.checked = true;
+                }
+
+                const span = document.createElement("span");
+                span.textContent = ch;
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                listChannels.appendChild(label);
+            }
+        }
+
+        comboTimeCol.addEventListener("change", () => {
+            if (!appState.headers.length) return;
+            updateMetaLabels(comboTimeCol.value);
+        });
+
+        function getSelectedChannels() {
+            const checkboxes = listChannels.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // Run Diagnostics
+        btnAnalyze.addEventListener("click", runDiagnostics);
+
+        function runDiagnostics() {
+            if (!appState.headers.length) return;
+
+            const selectedChannels = getSelectedChannels();
+            if (selectedChannels.length === 0) {
+                alert("Please select at least one vibration channel to analyze.");
+                return;
+            }
+
+            const timeCol = comboTimeCol.value;
+            const startTime = parseFloat(spinStartTime.value) || 0.0;
+            const duration = parseFloat(spinDuration.value) || 2.0;
+            const maxFreqLimit = parseInt(spinMaxFreq.value, 10) || 200;
+            const sigma = parseFloat(spinSigma.value);
+            const validSigma = Number.isNaN(sigma) ? 0.5 : sigma;
+
+            const startSample = Math.round(startTime * appState.samplingRate);
+            const numSamples = Math.round(duration * appState.samplingRate);
+
+            if (startSample < 0 || startSample >= appState.totalSamples) {
+                alert(`Start Sample Index (${startSample}) is out of bounds for the dataset (0 to ${appState.totalSamples - 1}). Adjust Start Time.`);
+                return;
+            }
+
+            const actualNumSamples = Math.min(numSamples, appState.totalSamples - startSample);
+            if (actualNumSamples < 4) {
+                alert("Not enough samples to calculate FFT. Increase duration.");
+                return;
+            }
+
+            const fullTimes = appState.columnsData[timeCol];
+            const segmentTimes = fullTimes.subarray(startSample, startSample + actualNumSamples);
+
+            // Destroy existing cards
+            for (const card of appState.activeCards) {
+                card.destroy();
+            }
+            appState.activeCards = [];
+            chartsGrid.innerHTML = "";
+
+            // Configure Grid columns to match selected channels
+            chartsGrid.style.gridTemplateColumns = `repeat(${selectedChannels.length}, minmax(420px, 1fr))`;
+            chartsGrid.style.gridTemplateRows = "repeat(2, minmax(360px, 1fr))";
+
+            appState.analysisResults = {
+                time: segmentTimes,
+                channels: {},
+                frequencies: null
+            };
+
+            const timeCardsRow = [];
+            const freqCardsRow = [];
+
+            selectedChannels.forEach((ch) => {
+                const fullSignal = appState.columnsData[ch];
+                const segmentSignal = fullSignal.subarray(startSample, startSample + actualNumSamples);
+
+                // 1. Compute single-sided spectrum FFT
+                const { frequencies: freqs, mag, signalRms, signalRatio } = computeFft(
+                    segmentSignal,
+                    appState.samplingRate,
+                    actualNumSamples
+                );
+
+                // 2. Smooth full spectrum using Gaussian filter
+                const smoothedMag = gaussianFilter1d(mag, validSigma);
+
+                // 3. Calculate index threshold for plotting max freq
+                let limitIdx = freqs.length;
+                for (let i = 0; i < freqs.length; i++) {
+                    if (freqs[i] > maxFreqLimit) {
+                        limitIdx = i;
+                        break;
+                    }
+                }
+
+                const filteredFreqs = freqs.subarray(0, limitIdx);
+                const filteredMag = smoothedMag.subarray(0, limitIdx);
+
+                // 4. Find 1X peak frequency (exclude DC bin)
+                let freq1x = 0.0;
+                let mag1x = 0.0;
+                if (filteredMag.length > 1) {
+                    let maxIdx = 1;
+                    for (let i = 2; i < filteredMag.length; i++) {
+                        if (filteredMag[i] > filteredMag[maxIdx]) {
+                            maxIdx = i;
+                        }
+                    }
+                    freq1x = filteredFreqs[maxIdx];
+                    mag1x = filteredMag[maxIdx];
+                }
+
+                // 5. Compute Overall Acceleration in Band
+                let overallAcc = 0.0;
+                if (filteredMag.length > 1) {
+                    let sumSq = 0.0;
+                    for (let i = 1; i < filteredMag.length; i++) {
+                        sumSq += filteredMag[i] * filteredMag[i];
+                    }
+                    overallAcc = Math.sqrt(sumSq);
+                }
+
+                appState.analysisResults.channels[ch] = {
+                    rawSignal: segmentSignal,
+                    rawMag: mag,
+                    smoothedMag: smoothedMag,
+                    signalRms: signalRms,
+                    signalRatio: signalRatio,
+                    freq1x: freq1x,
+                    mag1x: mag1x,
+                    overallAcc: overallAcc,
+                    limitIdx: limitIdx
+                };
+
+                if (!appState.analysisResults.frequencies) {
+                    appState.analysisResults.frequencies = freqs;
+                }
+
+                // 6. Instantiate on-screen interactive plots
+                const timeCard = new ChartCard(`📈 Time Domain - ${ch}`, false, ch, appState);
+                const freqCard = new ChartCard(`⚡ Frequency Domain (FFT) - ${ch}`, true, ch, appState);
+
+                timeCard.setData({
+                    time: segmentTimes,
+                    signal: segmentSignal
+                });
+                freqCard.setData({
+                    freqs: filteredFreqs,
+                    mag: filteredMag,
+                    freq1x: freq1x,
+                    mag1x: mag1x,
+                    overallAcc: overallAcc
+                });
+
+                timeCardsRow.push(timeCard);
+                freqCardsRow.push(freqCard);
+            });
+
+            // Place Row 0 (Time Domain) then Row 1 (Frequency Domain)
+            for (const tc of timeCardsRow) {
+                chartsGrid.appendChild(tc.element);
+                appState.activeCards.push(tc);
+            }
+            for (const fc of freqCardsRow) {
+                chartsGrid.appendChild(fc.element);
+                appState.activeCards.push(fc);
+            }
+
+            // Switch stack display page to showing charts
+            emptyWidget.style.display = "none";
+            scrollArea.style.display = "block";
+            btnExportData.disabled = false;
+            btnExportImages.disabled = false;
+
+            // Ensure canvases draw once layout settles
+            requestAnimationFrame(() => {
+                for (const card of appState.activeCards) {
+                    card.drawCanvas();
+                }
+            });
+        }
+
+        // Export FFT Data (CSV)
+        btnExportData.addEventListener("click", () => {
+            if (!appState.analysisResults || !appState.analysisResults.frequencies) return;
+
+            const freqs = appState.analysisResults.frequencies;
+            const channels = Object.keys(appState.analysisResults.channels);
+            const baseName = appState.fileName ? appState.fileName.replace(/\.csv$/i, "") : "Data";
+            const defaultFilename = `${baseName}_FFT_Analysis.csv`;
+
+            const headerCols = ["Frequency (Hz)"];
+            for (const ch of channels) {
+                headerCols.push(`${ch}_Mag_Linear`);
+                headerCols.push(`${ch}_Mag_dB`);
+            }
+
+            const lines = [headerCols.join(",")];
+            for (let i = 0; i < freqs.length; i++) {
+                const row = [freqs[i]];
+                for (const ch of channels) {
+                    const sm = appState.analysisResults.channels[ch].smoothedMag[i];
+                    const db = 20 * Math.log10(Math.max(sm, 1e-12) / 1e-5);
+                    row.push(sm);
+                    row.push(db);
+                }
+                lines.push(row.join(","));
+            }
+
+            const csvContent = "\uFEFF" + lines.join("\r\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = defaultFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        // Export All Graphs (JPG)
+        btnExportImages.addEventListener("click", () => {
+            if (!appState.analysisResults) return;
+
+            const selectedChannels = getSelectedChannels();
+            const segmentTimes = appState.analysisResults.time;
+            const freqs = appState.analysisResults.frequencies;
+            const channels = appState.analysisResults.channels;
+            const baseName = appState.fileName ? appState.fileName.replace(/\.csv$/i, "") : "Data";
+
+            let delay = 0;
+            for (const ch of selectedChannels) {
+                if (!channels[ch]) continue;
+                const chData = channels[ch];
+                const limitIdx = chData.limitIdx;
+
+                setTimeout(() => {
+                    exportChartAsJpg(
+                        `${baseName}_${ch}_Time_Domain.jpg`,
+                        false,
+                        ch,
+                        { time: segmentTimes, signal: chData.rawSignal },
+                        "linear"
+                    );
+                }, delay);
+                delay += 250;
+
+                setTimeout(() => {
+                    exportChartAsJpg(
+                        `${baseName}_${ch}_Frequency_Spectrum.jpg`,
+                        true,
+                        ch,
+                        { freqs: freqs.subarray(0, limitIdx), mag: chData.smoothedMag.subarray(0, limitIdx) },
+                        "linear"
+                    );
+                }, delay);
+                delay += 250;
+            }
+        });
+    </script>
+</body>
+</html>
